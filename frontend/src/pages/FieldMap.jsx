@@ -175,7 +175,7 @@ export default function FieldMap({ robotStatus, setRobotStatus, plants, onInspec
       <section className="rounded-2xl bg-white p-5 shadow-sm md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-green-800"><Sprout size={20} /><span className="text-sm font-semibold uppercase tracking-wider">Verger de démonstration</span></div>
+            <div className="flex items-center gap-2 text-green-800"><Sprout size={20} /><span className="text-sm font-semibold uppercase tracking-wider">Parcelles de cultures variées</span></div>
             <h2 className="mt-2 text-2xl font-bold text-gray-900">Carte du champ</h2>
             <p className="mt-1 text-sm text-gray-500">Champ de 100 × 100 m · coordonnées locales X/Y · cliquez pour ajouter un waypoint</p>
           </div>
@@ -187,11 +187,11 @@ export default function FieldMap({ robotStatus, setRobotStatus, plants, onInspec
             <div className="relative h-[460px] overflow-hidden rounded-xl border border-green-900/20 bg-[#788c55] md:h-[560px]">
               <MapContainer crs={L.CRS.Simple} center={[50, 50]} zoom={0} minZoom={-1} maxZoom={3} zoomControl style={{ height: "100%", width: "100%", background: "#788c55" }}>
                 <FitField />
-                <ImageOverlay url="/fields/olive-grove.svg" bounds={FIELD_BOUNDS} interactive={false} />
+                <ImageOverlay url="/fields/mixed-crops.svg" bounds={FIELD_BOUNDS} interactive={false} />
                 <FieldClicks onAdd={addWaypoint} />
                 <FieldGrid />
                 <CoordinateLabels />
-                {plants.map((plant) => <CircleMarker key={plant.id} center={[plant.y, plant.x]} radius={6} pathOptions={{ color: "#fff", weight: 1.5, fillColor: getMapColor(plant.status), fillOpacity: 0.95 }} eventHandlers={{ click: () => onSelectPlant(plant.id) }}><Tooltip direction="top"><b>{plant.id}</b> · {plant.name}<br />X {plant.x.toFixed(1)} m · Y {plant.y.toFixed(1)} m<br />{plant.status}<br /><span style={{ color: "#166534", fontWeight: 700 }}>View Plant Profile →</span></Tooltip></CircleMarker>)}
+                {plants.map((plant) => <CircleMarker key={plant.id} center={[plant.y, plant.x]} radius={6} pathOptions={{ color: "#fff", weight: 1.5, fillColor: getMapColor(plant.status), fillOpacity: 0.95 }} eventHandlers={{ click: () => onSelectPlant(plant.id) }}><Tooltip direction="top"><b>{plant.id}</b> · {plant.cropName} · {plant.name}<br />X {plant.x.toFixed(1)} m · Y {plant.y.toFixed(1)} m<br />{plant.status}<br /><span style={{ color: "#166534", fontWeight: 700 }}>View Plant Profile →</span></Tooltip></CircleMarker>)}
                 <Polyline positions={routeLine} pathOptions={{ color: "#fff", weight: 7, opacity: 0.9, lineCap: "round", lineJoin: "round" }} />
                 <Polyline positions={routeLine} pathOptions={{ color: "#ef4444", weight: 3, opacity: 0.95, lineCap: "round", lineJoin: "round" }} />
                 {trail.length > 1 && <Polyline positions={trail.map(({ x, y }) => [y, x])} pathOptions={{ color: "#fbbf24", weight: 4, opacity: 0.95, lineCap: "round" }} />}
@@ -204,10 +204,9 @@ export default function FieldMap({ robotStatus, setRobotStatus, plants, onInspec
               <div className="absolute bottom-3 right-3 z-[500] rounded-lg bg-gray-950/85 px-3 py-2 font-mono text-xs text-white shadow"><Crosshair className="mr-1 inline" size={13} />{currentPosition}</div>
             </div>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-600">
-              <span><i className="mr-1.5 inline-block h-3 w-3 rounded-full bg-green-600 align-middle" />Healthy tree</span>
-              <span><i className="mr-1.5 inline-block h-3 w-3 rounded-full bg-red-600 align-middle" />Anomaly</span>
-              <span><i className="mr-1.5 inline-block h-3 w-3 rounded-full bg-orange-500 align-middle" />Disease suspected</span>
-              <span><i className="mr-1.5 inline-block h-3 w-3 rounded-full bg-gray-500 align-middle" />Needs verification / not inspected</span>
+              <span><i className="mr-1.5 inline-block h-3 w-3 rounded-full bg-green-600 align-middle" />Plante saine</span>
+              <span><i className="mr-1.5 inline-block h-3 w-3 rounded-full bg-orange-500 align-middle" />Anomalie potentielle</span>
+              <span><i className="mr-1.5 inline-block h-3 w-3 rounded-full bg-gray-500 align-middle" />Inconnu / à vérifier</span>
               <span><i className="mr-1.5 inline-block h-3 w-3 rounded-full bg-green-600 align-middle" />Départ</span>
               <span><i className="mr-1.5 inline-block h-3 w-3 rounded-full bg-red-500 align-middle" />Waypoints</span>
               <span><i className="mr-1.5 inline-block h-1 w-4 bg-red-500 align-middle" />Trajet prévu</span>

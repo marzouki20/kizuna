@@ -4,100 +4,110 @@ const daysAgo = (days) => {
   return date.toISOString();
 };
 
-function simulatedProfile(index, status) {
-  const issue = status === "Anomaly Detected"
-    ? { name: "Canopy discoloration pattern", symptoms: "A small area of irregular leaf color was flagged for review in the simulated image." }
-    : status === "Disease Suspected"
-      ? { name: "Possible leaf spot symptoms", symptoms: "Several small marks are visible in the simulated canopy image; this is an unverified visual observation." }
-      : status === "Needs Verification"
-        ? { name: "Image requires review", symptoms: "Image quality or visual evidence was insufficient for a reliable simulated classification." }
-        : { name: "No anomaly flagged", symptoms: "No visible anomaly was flagged during this simulated scan." };
-  const issueStatus = status === "Healthy" ? "Healthy" : status;
-  const inspectedAt = status === "Needs Verification" ? null : daysAgo((index % 18) + 1);
+// Add crop configurations here to make a new crop available throughout the UI.
+export const cropCatalog = [
+  { key: "olive", name: "Olivier", code: "OL", symbol: "OL", model: "demo-crop-vision-v1" },
+  { key: "tomato", name: "Tomate", code: "TOM", symbol: "TM", model: "demo-crop-vision-v1" },
+  { key: "potato", name: "Pomme de terre", code: "POT", symbol: "PT", model: "demo-crop-vision-v1" },
+  { key: "grape", name: "Vigne", code: "VIG", symbol: "VG", model: "demo-crop-vision-v1" },
+  { key: "wheat", name: "Blé", code: "BLE", symbol: "BL", model: "demo-crop-vision-v1" },
+  { key: "citrus", name: "Agrumes", code: "CIT", symbol: "AG", model: "demo-crop-vision-v1" },
+  { key: "pepper", name: "Poivron", code: "PEP", symbol: "PO", model: "demo-crop-vision-v1" },
+  { key: "strawberry", name: "Fraisier", code: "FRA", symbol: "FR", model: "demo-crop-vision-v1" },
+  { key: "corn", name: "Maïs", code: "MAI", symbol: "MZ", model: "demo-crop-vision-v1" },
+  { key: "other", name: "Autre culture", code: "AUT", symbol: "AU", model: "demo-crop-vision-v1" },
+];
+
+export function getCropConfig(cropType) {
+  return cropCatalog.find((crop) => crop.key === cropType)
+    || { key: cropType || "other", name: cropType || "Autre culture", code: "AUT", symbol: "AU", model: "demo-crop-vision-v1" };
+}
+
+function cropIllustration(crop) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440"><defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="#dce8ca"/><stop offset="1" stop-color="#9caf78"/></linearGradient></defs><rect width="800" height="440" fill="url(#g)"/><path d="M0 350Q200 270 400 350T800 350V440H0Z" fill="#8c8058"/><g stroke="#345d36" stroke-width="10" stroke-linecap="round" fill="none" opacity=".83"><path d="M80 350V205m0 70-48-38m48 14 49-43M210 335V170m0 90-50-44m50 10 45-52M360 345V190m0 95-52-46m52 17 52-49M510 345V170m0 97-47-52m47 18 54-47M665 350V190m0 91-50-46m50 15 55-47"/></g><g fill="#527b46" opacity=".8"><circle cx="80" cy="190" r="45"/><circle cx="206" cy="160" r="50"/><circle cx="360" cy="180" r="46"/><circle cx="510" cy="160" r="50"/><circle cx="663" cy="180" r="48"/></g><rect x="24" y="24" width="752" height="392" rx="24" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="3"/><rect x="30" y="30" width="118" height="43" rx="21" fill="#24452f"/><text x="89" y="58" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="white">SIMULATION</text><text x="400" y="403" text-anchor="middle" font-family="Arial,sans-serif" font-size="26" font-weight="700" fill="#fff">${crop.name} · Image illustrative</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+const demoStates = ["Healthy", "Potential Anomaly", "Unknown / Verify", "Healthy", "Potential Anomaly", "Healthy"];
+const symptomSamples = [
+  { issue: "Variation visuelle à examiner", symptoms: "Une variation de couleur est visible sur une petite zone de l’image simulée." },
+  { issue: "Couverture foliaire à vérifier", symptoms: "La couverture végétale semble irrégulière dans cette image de démonstration." },
+  { issue: "Inconnu / à vérifier", symptoms: "Les éléments visuels simulés ne suffisent pas à établir une classification fiable." },
+];
+
+function makeProfile(crop, cropIndex, sampleIndex) {
+  const sequence = sampleIndex + 1;
+  const status = demoStates[(sampleIndex + cropIndex) % demoStates.length];
+  const sample = status === "Healthy" ? { issue: "Aucune anomalie visuelle signalée", symptoms: "Aucune anomalie visible n’est signalée dans cette image simulée." }
+    : status === "Unknown / Verify" ? symptomSamples[2] : symptomSamples[(cropIndex + sampleIndex) % 2];
+  const inspectedAt = daysAgo((cropIndex * 3 + sampleIndex + 1) % 24 + 1);
+  const photo = cropIllustration(crop);
+  const confidence = status === "Unknown / Verify" ? null : 68 + ((cropIndex * 7 + sampleIndex * 5) % 29);
+  const id = `${crop.code}-${String(sequence).padStart(3, "0")}`;
+  const model = crop.model;
 
   return {
-    id: `OL-${String(index + 1).padStart(3, "0")}`,
-    name: `Olivier ${String(index + 1).padStart(3, "0")}`,
-    x: Number((5.5 + (index % 10) * 10).toFixed(1)),
-    y: Number((94.5 - Math.floor(index / 10) * 20).toFixed(1)),
-    photo: "/fields/olive-tree.svg",
+    id,
+    cropType: crop.key,
+    cropName: crop.name,
+    name: `${crop.name} ${String(sequence).padStart(3, "0")}`,
+    x: Number((8 + ((cropIndex * 17 + sampleIndex * 19) % 84)).toFixed(1)),
+    y: Number((7 + ((cropIndex * 23 + sampleIndex * 13) % 86)).toFixed(1)),
+    photo,
     lastInspection: inspectedAt,
-    status: issueStatus,
-    history: inspectedAt ? [{
-      id: `seed-${index + 1}`,
-      date: inspectedAt,
-      status: issueStatus,
-      confidence: status === "Healthy" ? 94 : 70 + (index % 20),
-      summary: issue.name,
-      simulated: true,
-    }] : [],
+    status,
+    history: [{ id: `sim-${id}`, date: inspectedAt, status, confidence, summary: sample.issue, simulated: true }],
     detection: {
-      issueName: issue.name,
-      symptoms: issue.symptoms,
-      analyzedPhoto: "/fields/olive-tree.svg",
-      confidence: status === "Healthy" ? 94 : 70 + (index % 20),
+      cropType: crop.key,
+      cropName: crop.name,
+      cropConfidence: 82 + ((cropIndex * 5 + sampleIndex * 3) % 17),
+      issueName: sample.issue,
+      diseaseName: null,
+      symptoms: sample.symptoms,
+      result: status,
+      analyzedPhoto: photo,
+      confidence,
+      model,
       detectedAt: inspectedAt,
       simulated: true,
     },
     treatment: {
-      suspectedProblem: status === "Healthy" ? "No problem suspected" : issue.name,
-      preventiveMeasures: "Continue routine observation and record clear photographs of any changing symptoms.",
-      product: "Agronomic verification required",
-      activeSubstance: "Not verified",
-      precautions: "Do not apply a product based on this simulated result. Consult a qualified local agronomist and verify the official product label and local authorization.",
-      status: "Pending Verification",
+      suspectedProblem: status === "Healthy" ? "Aucun problème suspecté" : sample.issue,
+      preventiveMeasures: "Poursuivre la surveillance régulière et conserver des images comparables de la culture.",
+      recommendedActions: "Réaliser une nouvelle observation nette, examiner plusieurs plantes voisines et consigner les changements constatés.",
+      product: null,
+      activeSubstance: null,
+      authorizedUse: "Non vérifié — aucun produit indiqué.",
+      source: null,
+      precautions: "Ne pas appliquer de produit sur la base de cette simulation. Toute intervention doit être vérifiée par un agronome local et sur l’étiquette officielle autorisée pour cette culture.",
+      status: "Vérification agronomique nécessaire",
       simulated: true,
     },
   };
 }
 
-const initialStates = Array.from({ length: 50 }, (_, index) => {
-  if ((index + 1) % 13 === 0) return "Anomaly Detected";
-  if ((index + 1) % 11 === 0) return "Disease Suspected";
-  if ((index + 1) % 7 === 0) return "Needs Verification";
-  return "Healthy";
-});
-
-export const initialPlants = initialStates.map((status, index) => simulatedProfile(index, status));
+export const initialPlants = cropCatalog.flatMap((crop, cropIndex) =>
+  Array.from({ length: crop.key === "other" ? 2 : 4 }, (_, sampleIndex) => makeProfile(crop, cropIndex, sampleIndex)),
+);
 
 export function getMapColor(status) {
   if (status === "Healthy") return "#16a34a";
-  if (status === "Anomaly Detected") return "#dc2626";
-  if (status === "Disease Suspected") return "#f97316";
+  if (status === "Potential Anomaly") return "#f97316";
   return "#6b7280";
 }
 
 export function inspectPlant(plant) {
   const inspectedAt = new Date().toISOString();
-  const status = plant.status === "Needs Verification" ? "Healthy" : plant.status;
-  const nextConfidence = status === "Healthy" ? 93 : Math.min(96, (plant.detection?.confidence || 76) + 1);
-  const summary = status === "Healthy" ? "No anomaly flagged" : plant.detection?.issueName || "Visual observation flagged for review";
-  const record = {
-    id: crypto.randomUUID(),
-    date: inspectedAt,
-    status,
-    confidence: nextConfidence,
-    summary,
-    simulated: true,
-  };
-
+  const status = "Unknown / Verify";
+  const confidence = null;
+  const summary = "Inconnu / à vérifier — aucun modèle connecté";
+  const record = { id: crypto.randomUUID(), date: inspectedAt, status, confidence, summary, simulated: true };
   return {
     ...plant,
     lastInspection: inspectedAt,
     status,
     history: [...(plant.history || []), record],
-    detection: {
-      ...plant.detection,
-      issueName: status === "Healthy" ? "No anomaly flagged" : plant.detection?.issueName,
-      symptoms: status === "Healthy"
-        ? "No visible anomaly was flagged during this simulated scan."
-        : plant.detection?.symptoms,
-      confidence: nextConfidence,
-      detectedAt: inspectedAt,
-      simulated: true,
-    },
-    treatment: status === "Healthy"
-      ? { ...plant.treatment, suspectedProblem: "No problem suspected" }
-      : plant.treatment,
+    detection: { ...plant.detection, issueName: summary, diseaseName: null, symptoms: "Aucun modèle IA connecté pour analyser cette nouvelle inspection. Enregistrer l’image pour une vérification ultérieure.", result: status, confidence, cropConfidence: null, model: null, detectedAt: inspectedAt, simulated: true },
+    treatment: { ...plant.treatment, suspectedProblem: summary, product: null, activeSubstance: null, authorizedUse: "Non vérifié — aucun produit indiqué." },
   };
 }

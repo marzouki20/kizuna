@@ -31,3 +31,14 @@ button {
 button:disabled {
   cursor: not-allowed;
 }
+
+.auth-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #40513e;
+  background: #f7f8f5;
+  font-size: 14px;
+}

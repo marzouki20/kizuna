@@ -1,9 +1,16 @@
 
 import { useCallback, useEffect, useState } from "react";
+import { BrowserRouter, Navigate, useLocation, useNavigate } from "react-router-dom";
 import FieldMap from "./pages/FieldMap";
 import PlantProfiles from "./pages/PlantProfiles";
-import { formatDate, statusStyle } from "./components/plantProfileUtils";
-import { initialPlants, inspectPlant } from "./data/plants";
+import Login from "./pages/Login";
+import { AuthProvider } from "./auth/AuthContext.jsx";
+import { useAuth } from "./auth/useAuth";
+import DetectionResults from "./pages/DetectionResults";
+import TreatmentRecommendations from "./pages/TreatmentRecommendations";
+import CropReport from "./pages/CropReport";
+import { cropCatalog, getCropConfig, initialPlants, inspectPlant } from "./data/plants";
+import CropFilter from "./components/CropFilter";
 
 import {
   LayoutDashboard,
@@ -23,6 +30,7 @@ import {
   Menu,
   X,
   Wifi,
+  LogOut,
 } from "lucide-react";
 
 const navigation = [
@@ -35,15 +43,46 @@ const navigation = [
   { name: "Reports", icon: BarChart3 },
 ];
 
-function App() {
-  const [activePage, setActivePage] = useState("Dashboard");
+const pagePaths = {
+  Dashboard: "/dashboard",
+  "Field Map": "/field-map",
+  "Robot Control": "/robot-control",
+  "AI Plant Detection": "/ai-plant-detection",
+  "Plant Profiles": "/plant-profiles",
+  Treatments: "/treatments",
+  Reports: "/reports",
+};
+
+function Workspace() {
+  const { user, loading, signOut } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activePage = Object.keys(pagePaths).find((page) => pagePaths[page] === location.pathname);
+  const [cropFilter, setCropFilter] = useState("all");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [robotStatus, setRobotStatus] = useState("Standby");
   const [selectedPlantId, setSelectedPlantId] = useState(null);
   const [plants, setPlants] = useState(() => {
     try {
       const saved = localStorage.getItem("robocore.plants.v1");
-      return saved ? JSON.parse(saved) : initialPlants;
+      if (!saved) return initialPlants;
+      const restored = JSON.parse(saved);
+      if (!Array.isArray(restored)) return initialPlants;
+      const codeToCrop = Object.fromEntries(cropCatalog.map((crop) => [crop.code, crop]));
+      const migrated = restored.map((plant) => {
+        const config = plant.cropType ? getCropConfig(plant.cropType) : codeToCrop[plant.id?.split("-")[0]] || cropCatalog[0];
+        const status = ["Disease Suspected", "Anomaly Detected"].includes(plant.status) ? "Potential Anomaly" : plant.status === "Needs Verification" ? "Unknown / Verify" : plant.status;
+        return {
+          ...plant,
+          cropType: config.key,
+          cropName: config.name,
+          status,
+          detection: { ...plant.detection, cropType: config.key, cropName: config.name, model: plant.detection?.model || config.model, diseaseName: null, issueName: status === "Healthy" ? "Aucune anomalie visuelle signalée" : status === "Unknown / Verify" ? "Inconnu / à vérifier" : "Anomalie visuelle à vérifier", result: status, confidence: status === "Unknown / Verify" ? null : plant.detection?.confidence ?? null },
+          treatment: { ...plant.treatment, product: null, activeSubstance: null, authorizedUse: "Non vérifié — aucun produit indiqué.", suspectedProblem: status === "Healthy" ? "Aucun problème suspecté" : "Anomalie visuelle à vérifier" },
+        };
+      });
+      const ids = new Set(migrated.map((plant) => plant.id));
+      return [...migrated, ...initialPlants.filter((plant) => !ids.has(plant.id))];
     } catch {
       return initialPlants;
     }
@@ -61,13 +100,20 @@ function App() {
 
   const openPlantProfile = (plantId) => {
     setSelectedPlantId(plantId);
-    setActivePage("Plant Profiles");
+    navigate(pagePaths["Plant Profiles"]);
   };
 
-  const inspectedCount = plants.filter((plant) => plant.lastInspection).length;
-  const healthyCount = plants.filter((plant) => plant.status === "Healthy").length;
-  const flaggedCount = plants.filter((plant) => ["Anomaly Detected", "Disease Suspected"].includes(plant.status)).length;
-  const stats = { battery: 95, reservoir: 80, inspected: inspectedCount, healthy: healthyCount, diseased: flaggedCount, treatments: 0 };
+  const visiblePlants = cropFilter === "all" ? plants : plants.filter((plant) => plant.cropType === cropFilter);
+
+  if (loading) return <div className="auth-loading"><span className="login-spinner" /> Restoring your secure session…</div>;
+  if (!user) return location.pathname === "/login" ? <Login /> : <Navigate to="/login" replace state={{ from: location }} />;
+  if (location.pathname === "/login" || location.pathname === "/") return <Navigate to={pagePaths.Dashboard} replace />;
+  if (!activePage) return <Navigate to={pagePaths.Dashboard} replace />;
+
+  const inspectedCount = visiblePlants.filter((plant) => plant.lastInspection).length;
+  const healthyCount = visiblePlants.filter((plant) => plant.status === "Healthy").length;
+  const flaggedCount = visiblePlants.filter((plant) => plant.status !== "Healthy").length;
+  const stats = { battery: 95, reservoir: 80, inspected: inspectedCount, healthy: healthyCount, anomalies: flaggedCount };
 
   const cards = [
     {
@@ -91,14 +137,14 @@ function App() {
       icon: Activity,
     },
     {
-      name: "Detected Anomalies",
-      value: stats.diseased,
+      name: "Potential Anomalies / To Verify",
+      value: stats.anomalies,
       icon: ShieldAlert,
     },
     {
-      name: "Treatments Done",
-      value: stats.treatments,
-      icon: Droplets,
+      name: "Crop Types Monitored",
+      value: new Set(visiblePlants.map((plant) => plant.cropType)).size,
+      icon: Sprout,
     },
   ];
 
@@ -143,7 +189,7 @@ function App() {
               <button
                 key={item.name}
                 onClick={() => {
-                  setActivePage(item.name);
+                  navigate(pagePaths[item.name]);
                   setSidebarOpen(false);
                   if (item.name === "Plant Profiles") setSelectedPlantId(null);
                 }}
@@ -166,6 +212,13 @@ function App() {
           <p className="text-xs mt-1">
             Simulation Mode
           </p>
+          <div className="mt-5 border-t border-green-800 pt-4">
+            <p className="truncate text-sm font-semibold text-white">{user.name}</p>
+            <p className="truncate text-xs text-green-300">{user.email}</p>
+            <button onClick={async () => { await signOut(); navigate("/login", { replace: true }); }} className="mt-4 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-green-100 hover:bg-green-900" type="button">
+              <LogOut size={17} /> Sign Out
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -204,6 +257,7 @@ function App() {
         </header>
 
         <main className="p-5 md:p-8 max-w-7xl mx-auto space-y-7">
+          {activePage !== "Robot Control" && <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-gray-500">Consultation filtrée par culture</p><CropFilter value={cropFilter} onChange={setCropFilter} /></div>}
           {activePage === "Dashboard" ? (
             <>
               {/* Welcome */}
@@ -339,28 +393,24 @@ function App() {
             <FieldMap
               robotStatus={robotStatus}
               setRobotStatus={setRobotStatus}
-              plants={plants}
+              plants={visiblePlants}
               onInspectPlant={inspectTree}
               onSelectPlant={openPlantProfile}
             />
           ) : activePage === "Plant Profiles" ? (
             <PlantProfiles
-              plants={plants}
+              plants={visiblePlants}
               selectedPlantId={selectedPlantId}
               onSelectPlant={setSelectedPlantId}
               onClearSelection={() => setSelectedPlantId(null)}
-              onOpenFieldMap={() => { setSelectedPlantId(null); setActivePage("Field Map"); }}
+              onOpenFieldMap={() => { setSelectedPlantId(null); navigate(pagePaths["Field Map"]); }}
             />
           ) : activePage === "AI Plant Detection" ? (
-            <section className="space-y-5">
-              <div className="rounded-2xl bg-white p-6 shadow-sm"><div className="flex items-center gap-3"><ScanSearch className="text-green-700" /><div><h2 className="text-2xl font-bold">AI Plant Detection</h2><p className="mt-1 text-sm text-gray-500">Simulated visual flags from the shared olive profiles. These are not confirmed diagnoses.</p></div></div><div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">All classifications and confidence scores in this demo are simulated and require qualified agronomic review.</div></div>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{plants.filter((plant) => plant.status !== "Healthy").map((plant) => <article key={plant.id} className="overflow-hidden rounded-xl bg-white shadow-sm"><img src={plant.detection.analyzedPhoto} alt={`Simulated canopy scan for ${plant.id}`} className="h-36 w-full object-cover" /><div className="p-4"><div className="flex items-start justify-between gap-2"><div><p className="text-xs font-bold text-green-800">{plant.id}</p><h3 className="font-bold">{plant.name}</h3></div><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusStyle(plant.status)}`}>{plant.status}</span></div><p className="mt-2 text-sm text-gray-600">{plant.detection.issueName}</p><p className="mt-2 text-xs text-gray-500">Confidence {plant.detection.confidence}% · {formatDate(plant.detection.detectedAt, true)}</p><button onClick={() => openPlantProfile(plant.id)} className="mt-4 rounded-lg bg-green-700 px-3 py-2 text-sm font-semibold text-white hover:bg-green-800">View Plant Profile</button></div></article>)}</div>
-            </section>
+            <DetectionResults plants={visiblePlants} onOpenPlant={openPlantProfile} />
           ) : activePage === "Treatments" ? (
-            <section className="space-y-5">
-              <div className="rounded-2xl bg-white p-6 shadow-sm"><div className="flex items-center gap-3"><Droplets className="text-green-700" /><div><h2 className="text-2xl font-bold">Treatment Recommendations</h2><p className="mt-1 text-sm text-gray-500">Review is required before any real world use.</p></div></div><div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Products and active substances have not been verified against official labels. No dosage or application advice is provided. Treatment actions are simulated.</div></div>
-              <div className="space-y-3">{plants.filter((plant) => plant.status !== "Healthy").map((plant) => <article key={plant.id} className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-white p-4 shadow-sm"><div className="flex items-center gap-3"><img src={plant.photo} alt="Olive tree" className="h-16 w-20 rounded-lg object-cover" /><div><p className="text-xs font-bold text-green-800">{plant.id} · {plant.name}</p><p className="mt-1 font-semibold text-gray-900">{plant.treatment.suspectedProblem}</p><p className="mt-1 text-sm text-gray-500">{plant.treatment.product} · {plant.treatment.status}</p></div></div><button onClick={() => openPlantProfile(plant.id)} className="rounded-lg border border-green-700 px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-50">Review recommendation</button></article>)}</div>
-            </section>
+            <TreatmentRecommendations plants={visiblePlants} onOpenPlant={openPlantProfile} />
+          ) : activePage === "Reports" ? (
+            <CropReport plants={visiblePlants} />
           ) : (
             <section className="bg-white rounded-2xl p-8 shadow-sm">
               <h2 className="text-2xl font-bold mb-3">
@@ -388,4 +438,6 @@ function App() {
   );
 }
 
-export default App;
+export default function App() {
+  return <BrowserRouter><AuthProvider><Workspace /></AuthProvider></BrowserRouter>;
+}

@@ -1,9 +1,8 @@
-export const plantStatuses = ["Healthy", "Anomaly Detected", "Disease Suspected", "Needs Verification"];
+export const plantStatuses = ["Healthy", "Potential Anomaly", "Unknown / Verify"];
 
 export function statusStyle(status) {
   if (status === "Healthy") return "bg-green-100 text-green-800";
-  if (status === "Anomaly Detected") return "bg-red-100 text-red-800";
-  if (status === "Disease Suspected") return "bg-orange-100 text-orange-800";
+  if (status === "Potential Anomaly" || status === "Anomaly Detected" || status === "Disease Suspected") return "bg-orange-100 text-orange-800";
   return "bg-gray-100 text-gray-700";
 }
 
