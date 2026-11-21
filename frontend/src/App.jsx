@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { BrowserRouter, Navigate, useLocation, useNavigate } from "react-router-dom";
 import FieldMap from "./pages/FieldMap";
 import PlantProfiles from "./pages/PlantProfiles";
@@ -11,6 +11,8 @@ import TreatmentRecommendations from "./pages/TreatmentRecommendations";
 import CropReport from "./pages/CropReport";
 import { cropCatalog, getCropConfig, initialPlants, inspectPlant } from "./data/plants";
 import CropFilter from "./components/CropFilter";
+import AssistantChat from "./components/AssistantChat";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
 
 import {
   LayoutDashboard,
@@ -19,13 +21,7 @@ import {
   ScanSearch,
   Droplets,
   BarChart3,
-  BatteryFull,
   Sprout,
-  ShieldAlert,
-  Activity,
-  Play,
-  Pause,
-  Square,
   Bell,
   Menu,
   X,
@@ -61,10 +57,15 @@ function Workspace() {
   const [cropFilter, setCropFilter] = useState("all");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [robotStatus, setRobotStatus] = useState("Standby");
+  const [robotPosition, setRobotPosition] = useState({ x: 10, y: 10 });
+  const [lastMission, setLastMission] = useState(null);
+  const [missionMetrics, setMissionMetrics] = useState({ progress: 0, distance: 0, inspected: 0, durationSeconds: 0 });
   const [selectedPlantId, setSelectedPlantId] = useState(null);
   const [plants, setPlants] = useState(() => {
     try {
-      const saved = localStorage.getItem("robocore.plants.v1");
+      const currentVersion = localStorage.getItem("robocore.plants.v2");
+      const legacyFormat = !currentVersion;
+      const saved = currentVersion || localStorage.getItem("robocore.plants.v1");
       if (!saved) return initialPlants;
       const restored = JSON.parse(saved);
       if (!Array.isArray(restored)) return initialPlants;
@@ -74,6 +75,8 @@ function Workspace() {
         const status = ["Disease Suspected", "Anomaly Detected"].includes(plant.status) ? "Potential Anomaly" : plant.status === "Needs Verification" ? "Unknown / Verify" : plant.status;
         return {
           ...plant,
+          x: legacyFormat ? Number((plant.x * 2).toFixed(1)) : plant.x,
+          y: legacyFormat ? Number((plant.y * 2).toFixed(1)) : plant.y,
           cropType: config.key,
           cropName: config.name,
           status,
@@ -89,7 +92,7 @@ function Workspace() {
   });
 
   useEffect(() => {
-    localStorage.setItem("robocore.plants.v1", JSON.stringify(plants));
+    localStorage.setItem("robocore.plants.v2", JSON.stringify(plants));
   }, [plants]);
 
   const inspectTree = useCallback((plantId) => {
@@ -104,49 +107,12 @@ function Workspace() {
   };
 
   const visiblePlants = cropFilter === "all" ? plants : plants.filter((plant) => plant.cropType === cropFilter);
+  const selectedPlant = plants.find((plant) => plant.id === selectedPlantId) || null;
 
   if (loading) return <div className="auth-loading"><span className="login-spinner" /> Restoring your secure session…</div>;
   if (!user) return location.pathname === "/login" ? <Login /> : <Navigate to="/login" replace state={{ from: location }} />;
   if (location.pathname === "/login" || location.pathname === "/") return <Navigate to={pagePaths.Dashboard} replace />;
   if (!activePage) return <Navigate to={pagePaths.Dashboard} replace />;
-
-  const inspectedCount = visiblePlants.filter((plant) => plant.lastInspection).length;
-  const healthyCount = visiblePlants.filter((plant) => plant.status === "Healthy").length;
-  const flaggedCount = visiblePlants.filter((plant) => plant.status !== "Healthy").length;
-  const stats = { battery: 95, reservoir: 80, inspected: inspectedCount, healthy: healthyCount, anomalies: flaggedCount };
-
-  const cards = [
-    {
-      name: "Battery Level",
-      value: `${stats.battery}%`,
-      icon: BatteryFull,
-    },
-    {
-      name: "Reservoir Level",
-      value: `${stats.reservoir}%`,
-      icon: Droplets,
-    },
-    {
-      name: "Plants Inspected",
-      value: stats.inspected,
-      icon: Sprout,
-    },
-    {
-      name: "Healthy Plants",
-      value: stats.healthy,
-      icon: Activity,
-    },
-    {
-      name: "Potential Anomalies / To Verify",
-      value: stats.anomalies,
-      icon: ShieldAlert,
-    },
-    {
-      name: "Crop Types Monitored",
-      value: new Set(visiblePlants.map((plant) => plant.cropType)).size,
-      icon: Sprout,
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
@@ -259,143 +225,28 @@ function Workspace() {
         <main className="p-5 md:p-8 max-w-7xl mx-auto space-y-7">
           {activePage !== "Robot Control" && <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-gray-500">Consultation filtrée par culture</p><CropFilter value={cropFilter} onChange={setCropFilter} /></div>}
           {activePage === "Dashboard" ? (
-            <>
-              {/* Welcome */}
-              <div className="bg-gradient-to-r from-green-900 to-green-700 text-white p-7 rounded-2xl">
-                <h2 className="text-3xl font-bold">
-                  Welcome to RoboCore
-                </h2>
-
-                <p className="mt-2 text-green-100">
-                  Intelligent crop monitoring and autonomous
-                  robot control.
-                </p>
-
-                <p className="mt-3 text-xs text-green-200">
-                  Demonstration data — no physical robot connected.
-                </p>
-              </div>
-
-              {/* Statistics */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-                {cards.map((card) => {
-                  const Icon = card.icon;
-
-                  return (
-                    <div
-                      key={card.name}
-                      className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="text-gray-500 text-sm">
-                            {card.name}
-                          </p>
-
-                          <h3 className="text-3xl font-bold text-gray-800 mt-3">
-                            {card.value}
-                          </h3>
-                        </div>
-
-                        <div className="p-3 rounded-xl bg-green-50">
-                          <Icon
-                            size={24}
-                            className="text-green-700"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Robot Control */}
-              <section className="bg-white rounded-2xl shadow-sm p-6">
-                <div className="flex justify-between items-center mb-5">
-                  <h3 className="text-xl font-bold text-gray-800">
-                    Robot Control
-                  </h3>
-
-                  <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm">
-                    {robotStatus}
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    onClick={() => setRobotStatus("Running")}
-                    className="flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white px-5 py-3 rounded-xl"
-                  >
-                    <Play size={18} />
-                    Start Mission
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      if (robotStatus === "Running") {
-                        setRobotStatus("Paused");
-                      }
-                    }}
-                    className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-5 py-3 rounded-xl"
-                  >
-                    <Pause size={18} />
-                    Pause
-                  </button>
-
-                  <button
-                    onClick={() => setRobotStatus("Stopped")}
-                    className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-xl"
-                  >
-                    <Square size={18} />
-                    Stop Robot
-                  </button>
-                </div>
-
-                <p className="text-sm text-gray-400 mt-4">
-                  Simulation only. No physical robot connected.
-                </p>
-              </section>
-
-              {/* System Overview */}
-              <section className="bg-white rounded-2xl shadow-sm p-6">
-                <h3 className="text-xl font-bold mb-4">
-                  System Overview
-                </h3>
-
-                <div className="grid sm:grid-cols-3 gap-4">
-                  <div className="bg-green-50 rounded-xl p-4">
-                    <Wifi className="text-green-700 mb-2" />
-                    <p className="font-semibold">Connection</p>
-                    <p className="text-sm text-gray-500">
-                      Simulation active
-                    </p>
-                  </div>
-
-                  <div className="bg-green-50 rounded-xl p-4">
-                    <ScanSearch className="text-green-700 mb-2" />
-                    <p className="font-semibold">AI Detection</p>
-                    <p className="text-sm text-gray-500">
-                      Mock AI service
-                    </p>
-                  </div>
-
-                  <div className="bg-green-50 rounded-xl p-4">
-                    <Bot className="text-green-700 mb-2" />
-                    <p className="font-semibold">Robot</p>
-                    <p className="text-sm text-gray-500">
-                      Virtual robot
-                    </p>
-                  </div>
-                </div>
-              </section>
-            </>
+            <Suspense fallback={<div className="rounded-2xl bg-white p-8 text-sm text-gray-500 shadow-sm">Chargement du tableau de bord…</div>}>
+              <Dashboard
+                plants={visiblePlants}
+                robotStatus={robotStatus}
+                robotPosition={robotPosition}
+                mission={lastMission}
+                missionMetrics={missionMetrics}
+                onOpenMap={() => navigate(pagePaths["Field Map"])}
+                onOpenPlant={openPlantProfile}
+              />
+            </Suspense>
           ) : activePage === "Field Map" ? (
             <FieldMap
               robotStatus={robotStatus}
               setRobotStatus={setRobotStatus}
+              onRobotPosition={setRobotPosition}
+              onMissionChange={setLastMission}
+              onMissionMetrics={setMissionMetrics}
+              initialRobotPosition={robotPosition}
               plants={visiblePlants}
               onInspectPlant={inspectTree}
-              onSelectPlant={openPlantProfile}
+              onViewFullProfile={openPlantProfile}
             />
           ) : activePage === "Plant Profiles" ? (
             <PlantProfiles
@@ -434,6 +285,15 @@ function Workspace() {
           aria-label="Close sidebar overlay"
         />
       )}
+      <AssistantChat context={{
+        simulation: true,
+        cropFilter,
+        plants: visiblePlants,
+        selectedPlant,
+        field: { width: 200, height: 200, unit: "cm", origin: "bottom-left" },
+        robot: { name: "RoboCore-01", status: robotStatus, position: robotPosition, positionUnit: "cm", battery: 95, simulated: true },
+        lastMission: lastMission ? { ...lastMission, status: robotStatus, simulated: true } : null,
+      }} />
     </div>
   );
 }
