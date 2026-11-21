@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="ground" x2="0" y2="1"><stop stop-color="#b8ad81"/><stop offset="1" stop-color="#68774e"/></linearGradient>
+    <radialGradient id="leaf" cx="35%" cy="30%"><stop stop-color="#a8ad6b"/><stop offset=".55" stop-color="#6e8148"/><stop offset="1" stop-color="#344a2e"/></radialGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="9"/></filter>
+  </defs>
+  <rect width="640" height="360" fill="url(#ground)"/>
+  <path d="M0 58h640M0 301h640" stroke="#dfd2a9" stroke-opacity=".45" stroke-width="18"/>
+  <g opacity=".45" fill="#35482c" filter="url(#soft)">
+    <ellipse cx="105" cy="18" rx="87" ry="65"/><ellipse cx="330" cy="-8" rx="100" ry="78"/><ellipse cx="555" cy="25" rx="85" ry="66"/>
+    <ellipse cx="5" cy="339" rx="83" ry="60"/><ellipse cx="245" cy="365" rx="97" ry="70"/><ellipse cx="490" cy="345" rx="100" ry="67"/>
+  </g>
+  <g>
+    <ellipse cx="318" cy="194" rx="144" ry="113" fill="#263627" opacity=".3"/>
+    <path d="M300 218l21-67 23 67" fill="#756744" opacity=".9"/>
+    <circle cx="322" cy="170" r="94" fill="url(#leaf)"/>
+    <circle cx="260" cy="159" r="48" fill="url(#leaf)"/><circle cx="377" cy="150" r="52" fill="url(#leaf)"/>
+    <circle cx="282" cy="215" r="45" fill="#52683a"/><circle cx="360" cy="220" r="51" fill="#405832"/>
+    <ellipse cx="293" cy="117" rx="46" ry="24" fill="#c0b77b" opacity=".26"/>
+    <ellipse cx="363" cy="125" rx="35" ry="18" fill="#bdba7d" opacity=".2"/>
+    <g fill="#d0c58b" opacity=".75"><circle cx="258" cy="168" r="3"/><circle cx="286" cy="135" r="3"/><circle cx="368" cy="177" r="3"/><circle cx="344" cy="228" r="3"/><circle cx="399" cy="155" r="2.5"/><circle cx="308" cy="199" r="2.5"/></g>
+  </g>
+  <rect width="640" height="360" fill="#142016" opacity=".08"/>
+</svg>
